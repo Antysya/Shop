@@ -1,5 +1,6 @@
 ﻿using Microsoft.AspNetCore.Mvc;
 using Shop;
+using System.Collections.Concurrent;
 
 namespace Shop
 {
@@ -15,6 +16,11 @@ namespace Shop
         public Product[] GetProducts()
         {
             return _products.ToArray();
+        }
+
+        public Product GetProduct(string productName)
+        {
+            return _products.First(p => p.Name == productName);
         }
 
         public void AddProducts(Product product)
@@ -36,6 +42,64 @@ namespace Shop
                 existingProduct.Price = product.Price;
             }
         }
+
+        //ДЗ3-Многопоточность
+
+        //async-await
+
+        private SemaphoreSlim _semaphore = new SemaphoreSlim(1); //задаем количество разрешений
+        public async Task<List<Product>> GetProductsAsync()
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                return _products.ToList();
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        public async Task<Product> GetProductAsync(string productName)
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                return _products.First(p => p.Name == productName);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        public async Task AddProductsAsync(Product product)
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                _products.Add(product);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
+        public async Task<bool> RemoveProductsAsync(Product product)
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                return _products.Remove(product);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+
     }
 }
 
