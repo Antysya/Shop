@@ -3,7 +3,7 @@
 namespace Shop
 {
     //ДЗ3-потокобезопасная коллекция
-    public class CatalogBag
+    public class CatalogBag 
     {
         private readonly ConcurrentBag<Product> _productsBag = new()
         {

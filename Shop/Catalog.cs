@@ -1,10 +1,12 @@
 ﻿using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.FileProviders;
 using Shop;
 using System.Collections.Concurrent;
+using System.Threading;
 
 namespace Shop
 {
-    public class Catalog
+    public class InMemoryCatalog: ICatalog
     {
         private readonly List<Product> _products = new()
         {
@@ -93,6 +95,46 @@ namespace Shop
             try
             {
                 return _products.Remove(product);
+            }
+            finally
+            {
+                _semaphore.Release();
+            }
+        }
+        private readonly RealClock _clock=new RealClock();
+
+        public decimal CalculateFinalPrice(Product product)
+        {
+            decimal finalPrice = product.Price;
+
+            if (_clock.Current().DayOfWeek == DayOfWeek.Monday)
+            {
+                finalPrice -= (finalPrice * 0.3m);
+            }
+
+            return finalPrice;
+        }
+
+        public async Task<List<Product>> GetProductsDiscountsAsync()
+        {
+            await _semaphore.WaitAsync();
+            try
+            {
+                List<Product> productsWithDiscounts = new List<Product>();
+                RealClock realClock = new RealClock();
+
+                foreach (var product in _products)
+                {
+                    decimal finalPrice = CalculateFinalPrice(product);
+
+                    // Создаем копию товара с примененной скидкой
+                    Product discountedProduct = new Product(product.Name, finalPrice);
+
+                    // Добавляем товар с учетом скидки в список
+                    productsWithDiscounts.Add(discountedProduct);
+                }
+
+                return productsWithDiscounts;
             }
             finally
             {

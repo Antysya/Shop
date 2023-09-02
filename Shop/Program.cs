@@ -9,49 +9,51 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
         options.SerializerOptions.WriteIndented = true;
     }
 );
-
+builder.Services.AddSingleton<ICatalog, InMemoryCatalog>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
+
+
 var app = builder.Build();
 app.UseSwagger();
 app.UseSwaggerUI();
 
 
-var catalog = new Catalog();
 
 app.MapGet("/", () => "Shop");
 
-
+#region
 //ДЗ2
-app.MapGet("/get_products",()=> catalog.GetProducts());
-app.MapPost("/get_product", ([FromBody] string productName) =>
-{
-    catalog.GetProduct(productName);
-}
-);
+//var catalog = new Catalog();
+//app.MapGet("/get_products",()=> catalog.GetProducts());
+//app.MapPost("/get_product", ([FromBody] string productName) =>
+//{
+//    catalog.GetProduct(productName);
+//}
+//);
 
-app.MapPost("/add_products", ([FromBody]Product product) =>
-{
-    catalog.AddProducts(product);
-    return Results.Created(uri: $"/get_product?name={product.Name}", product); //возвращает 201
-    }
-);
-app.MapDelete("/del_products", ([FromBody] Product product) => catalog.DelProducts(product));
-app.MapPut("/put_products", (string productName, Product product) => catalog.PutProducts(productName, product));
+//app.MapPost("/add_products", ([FromBody]Product product) =>
+//{
+//    catalog.AddProducts(product);
+//    return Results.Created(uri: $"/get_product?name={product.Name}", product); //возвращает 201
+//    }
+//);
+//app.MapDelete("/del_products", ([FromBody] Product product) => catalog.DelProducts(product));
+//app.MapPut("/put_products", (string productName, Product product) => catalog.PutProducts(productName, product));
 
 //ДЗ3
 //Многопоточность
 
-app.MapGet("/get_products_async", async () => await catalog.GetProductsAsync());
-app.MapPost("/add_products_async",async ([FromBody] Product product) =>
-{
-    await catalog.AddProductsAsync(product);
-}
-);
-app.MapDelete("/del_products_async", async ([FromBody] Product product) =>
-{
-    await catalog.RemoveProductsAsync(product);
-});
+//app.MapGet("/get_products_async", async () => await catalog.GetProductsAsync());
+//app.MapPost("/add_products_async",async ([FromBody] Product product) =>
+//{
+//    await catalog.AddProductsAsync(product);
+//}
+//);
+//app.MapDelete("/del_products_async", async ([FromBody] Product product) =>
+//{
+//    await catalog.RemoveProductsAsync(product);
+//});
 
 //потокобезопасная коллекция
 var catalogBag = new CatalogBag();
@@ -69,5 +71,50 @@ app.MapPost("/add_products_bag", ([FromBody] Product product) =>
 });
 
 app.MapDelete("/del_products_bag", ([FromBody] Product product) => catalogBag.RemoveProductBag(product));
+#endregion
+
+
+//ДЗ-4
+//Внедрение зависимости
+
+
+app.MapGet("/get_products", ([FromServices] ICatalog catalog) => catalog.GetProducts());
+app.MapPost("/get_product", ([FromBody] string productName, [FromServices] ICatalog catalog) =>
+{
+    catalog.GetProduct(productName);
+}
+);
+app.MapPost("/add_products", ([FromBody] Product product, [FromServices] ICatalog catalog) =>
+{
+    catalog.AddProducts(product);
+    return Results.Created(uri: $"/get_product?name={product.Name}", product); //возвращает 201
+}
+);
+app.MapDelete("/del_products", ([FromBody] Product product, [FromServices] ICatalog catalog) => catalog.DelProducts(product));
+app.MapPut("/put_products", (string productName, Product product, [FromServices] ICatalog catalog) => catalog.PutProducts(productName, product));
+
+app.MapGet("/get_product_async", async ([FromBody] Product product, [FromServices] ICatalog catalog) => await catalog.GetProductAsync(product.Name));
+app.MapGet("/get_products_async", async ([FromServices] ICatalog catalog) =>
+{
+    await catalog.GetProductsAsync();
+}
+);
+app.MapPost("/add_products_async", async ([FromBody] Product product, [FromServices] ICatalog catalog) =>
+{
+    await catalog.AddProductsAsync(product);
+}
+);
+app.MapDelete("/del_products_async", async ([FromBody] Product product, [FromServices] ICatalog catalog) =>
+{
+    await catalog.RemoveProductsAsync(product);
+});
+
+
+app.MapGet("/get_products_discounts_async", async ([FromServices] ICatalog catalog) =>
+{
+    await catalog.GetProductsDiscountsAsync();
+}
+);
+
 
 app.Run();
