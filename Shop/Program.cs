@@ -123,8 +123,6 @@ app.MapGet("/", () => "Shop");
 app.MapGet("/sendmail", async (IEmailService emailService) =>
 {
     await emailService.SendEmailAsync("antysya@mail.ru", "Подключение", "Сервер успешно запущен");
-}
-
-);
+});
 
 app.Run();
