@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Http.Json;
 using Microsoft.AspNetCore.Mvc;
 using Shop;
+using Shop.Configurations;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
@@ -9,11 +10,15 @@ builder.Services.Configure<Microsoft.AspNetCore.Http.Json.JsonOptions>(
         options.SerializerOptions.WriteIndented = true;
     }
 );
+builder.Services.AddOptions<SmtpConfig>()
+ .BindConfiguration("SmtpConfig")
+ .ValidateDataAnnotations()
+ .ValidateOnStart();
 
 builder.Services.AddSingleton<ICatalog, InMemoryCatalog>();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-builder.Services.AddScoped<IEmailService, EmailService>();
+builder.Services.AddScoped<ISmtpEmailSender, SmtpEmailSender>();
 
 
 var app = builder.Build();
@@ -120,7 +125,7 @@ app.MapGet("/", () => "Shop");
 #endregion
 
 //ДЗ 5. Фоновые сервисы. Scoped 
-app.MapGet("/sendmail", async (IEmailService emailService) =>
+app.MapGet("/sendmail", async (ISmtpEmailSender emailService) =>
 {
     await emailService.SendEmailAsync("antysya@mail.ru", "Подключение", "Сервер успешно запущен");
 });

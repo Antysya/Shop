@@ -1,6 +1,6 @@
 ﻿namespace Shop
 {
-    public interface IEmailService
+    public interface ISmtpEmailSender
     {
         Task SendEmailAsync(string recipient, string subject, string message);
     }
