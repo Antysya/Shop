@@ -8,66 +8,17 @@ using Microsoft.Extensions.Options;
 
 namespace Shop
 {
-    #region
-    /// <summary>
-    /// ДЗ_5
-    /// </summary>
-    //public class EmailService : IEmailService, IDisposable
-    //{
-    //    private readonly SmtpClient _smtpClient;
-
-    //    public EmailService()
-    //    {
-    //        _smtpClient = new SmtpClient();
-    //        _smtpClient.Connect("smtp.beget.com", 25, SecureSocketOptions.None);
-    //        _smtpClient.Authenticate("asp2022pd011@rodion-m.ru", "6WU4x2be");
-    //    }
-
-    //    public Task SendEmailAsync(string recipient, string subject, string message)
-    //    {
-    //        var emailMessage = new MimeMessage();
-    //        emailMessage.From.Add(new MailboxAddress("Anna E.", "asp2022pd011@rodion-m.ru"));
-    //        emailMessage.To.Add(new MailboxAddress("", recipient));
-    //        emailMessage.Subject = subject;
-    //        emailMessage.Body = new TextPart("plain")
-    //        {
-    //            Text = message
-    //        };
-
-    //        _smtpClient.Send(emailMessage);
-
-    //        return Task.CompletedTask;
-    //    }
-
-    //    public void Dispose()
-    //    {
-    //        _smtpClient.Disconnect(true);
-    //        _smtpClient.Dispose();
-    //    }
-    //}
-    #endregion
-
-    //ДЗ_6
     public class SmtpEmailSender : ISmtpEmailSender, IAsyncDisposable
     {
-        //private readonly string smtpServer = "smtp.beget.com";
-        //private readonly int smtpPort = 25;
-        //private readonly string address = "asp2022pd011@rodion-m.ru";
-        //private readonly string userName = "Anna E.";
-        //private readonly string password = "6WU4x2be"; 
         private readonly SmtpClient _smtpClient = new();
         private readonly SmtpConfig _smtpConfig;
+        private readonly ILogger<SmtpEmailSender> _logger; // добавляем логгер
 
-        //public SmtpEmailSender(IOptions<SmtpConfig> options)
-        //{
-        //    ArgumentNullException.ThrowIfNull(options);
-        //    _smtpConfig = options.Value;
-        //}
-
-        public SmtpEmailSender(IOptionsSnapshot<SmtpConfig> options)
+        public SmtpEmailSender(IOptionsSnapshot<SmtpConfig> options, ILogger<SmtpEmailSender> logger)
         {
             ArgumentNullException.ThrowIfNull(options);
             _smtpConfig = options.Value;
+            _logger = logger;
         }
 
         private async Task EnsureConnectedAndAuthenticated()
@@ -93,8 +44,31 @@ namespace Shop
             {
                 Text = message
             };
+            
+            _logger.LogInformation("Попытка отправить письмо: {Recipient}, {Subject}", recipient, subject);
+            var attempt = 0;
+            while (attempt < _smtpConfig.MaxRetryAttempts)
+            {
+                try
+                {
+                    await _smtpClient.SendAsync(emailMessage);
+                    _logger.LogInformation("Письмо успешно отправлено: {Recipient}, {Subject}", recipient, subject);
+                    break; 
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Ошибка при отправке письма: {Recipient}, {Subject}", recipient, subject);
+                    attempt++;
+                    if (attempt < _smtpConfig.MaxRetryAttempts)
+                    {
+                        await Task.Delay(TimeSpan.FromSeconds(30)); // Задержка перед повторной попыткой
+                        _logger.LogInformation("Повторная попытка отправки письма: {Recipient}, {Subject}", recipient, subject);
+                        continue;
+                    }
+                    _logger.LogError(ex, "Произошла ошибка. Письмо не отправлено: {Recipient}, {Subject}", recipient, subject);
 
-            await _smtpClient.SendAsync(emailMessage);
+                }
+            }
         }
 
         public async ValueTask DisposeAsync()
