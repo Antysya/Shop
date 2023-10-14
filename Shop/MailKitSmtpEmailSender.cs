@@ -9,13 +9,13 @@ using Org.BouncyCastle.Cms;
 
 namespace Shop
 {
-    public class SmtpEmailSender : ISmtpEmailSender, IAsyncDisposable
+    public class MailKitSmtpEmailSender : IEmailSender, IAsyncDisposable
     {
         private readonly SmtpClient _smtpClient = new();
         private readonly SmtpConfig _smtpConfig;
-        private readonly ILogger<SmtpEmailSender> _logger; // добавляем логгер
+        private readonly ILogger<MailKitSmtpEmailSender> _logger; // добавляем логгер
 
-        public SmtpEmailSender(IOptionsSnapshot<SmtpConfig> options, ILogger<SmtpEmailSender> logger)
+        public MailKitSmtpEmailSender(IOptionsSnapshot<SmtpConfig> options, ILogger<MailKitSmtpEmailSender> logger)
         {
             ArgumentNullException.ThrowIfNull(options);
             _smtpConfig = options.Value;
@@ -67,8 +67,12 @@ namespace Shop
             }
         }
 
-        public async Task SendEmailAsync(string recipient, string subject, string message)
+        public async Task SendEmailAsync(string recipient, string subject, string message, CancellationToken token)
         {
+            ArgumentException.ThrowIfNullOrEmpty(recipient);
+            ArgumentException.ThrowIfNullOrEmpty(subject);
+            ArgumentException.ThrowIfNullOrEmpty(message);
+
             await EnsureConnectedAndAuthenticated();
             var emailMessage = new MimeMessage();
             emailMessage.From.Add(new MailboxAddress(_smtpConfig.UserName, _smtpConfig.Address));
@@ -80,29 +84,6 @@ namespace Shop
             };
             await _smtpClient.SendAsync(emailMessage);
 
-            //var attempt = 0;
-            //while (attempt < _smtpConfig.MaxRetryAttempts)
-            //{
-            //    try
-            //    {
-            //        await _smtpClient.SendAsync(emailMessage);
-            //        _logger.LogInformation("Письмо успешно отправлено: {Recipient}, {Subject}", recipient, subject);
-            //        break;
-            //    }
-            //    catch (Exception ex)
-            //    {
-            //        _logger.LogWarning(ex, "Ошибка при отправке письма: {Recipient}, {Subject}", recipient, subject);
-            //        attempt++;
-            //        if (attempt < _smtpConfig.MaxRetryAttempts)
-            //        {
-            //            await Task.Delay(TimeSpan.FromSeconds(30)); // Задержка перед повторной попыткой
-            //            _logger.LogInformation("Повторная попытка отправки письма: {Recipient}, {Subject}", recipient, subject);
-            //            continue;
-            //        }
-            //        _logger.LogError(ex, "Произошла ошибка. Письмо не отправлено: {Recipient}, {Subject}", recipient, subject);
-
-            //    }
-            //}
         }
 
         public async ValueTask DisposeAsync()

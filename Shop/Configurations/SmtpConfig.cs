@@ -11,7 +11,9 @@ namespace Shop.Configurations
         [EmailAddress] public string Address { get; set; }
         [Required] public string UserName { get; set; }
         [Required] public string Password { get; set; }
-        public int MaxRetryAttempts { get; set; } = 2;
+        [Range(1, 1000)]
+        public int RetryLimit { get; set; }
+
 
     }
 }

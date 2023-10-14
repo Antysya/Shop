@@ -1,40 +1,50 @@
-﻿using Shop.Configurations;
+﻿using Microsoft.Extensions.Options;
+using Polly.Retry;
+using Polly;
+using Shop.Configurations;
 
 namespace Shop
 {
-    public class RetrySendDecorator : ISmtpEmailSender
+    public class RetrySendDecorator : IEmailSender
     {
-        private readonly ISmtpEmailSender _inner;
+        private readonly IEmailSender _innerEmailSender;
         private readonly ILogger<RetrySendDecorator> _logger;
+        private readonly SmtpConfig _conf;
+        private readonly AsyncRetryPolicy _policy;
 
-        public RetrySendDecorator(ISmtpEmailSender inner, ILogger<RetrySendDecorator> logger)
+        public RetrySendDecorator(IEmailSender innerEmailSender, ILogger<RetrySendDecorator> logger, IOptionsSnapshot<SmtpConfig> options)
         {
-            _inner = inner;
+            ArgumentNullException.ThrowIfNull(innerEmailSender);
+            ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(options);
+            _innerEmailSender = innerEmailSender;
             _logger = logger;
+            _conf = options.Value;
+
+            _policy = Policy
+                .Handle<ConnectionException>()
+                .WaitAndRetryAsync(_conf.RetryLimit, retryAttempt => TimeSpan.FromSeconds(Math.Pow(2, retryAttempt)),
+                onRetry: (exception, retryAttempt) =>
+                {
+                    _logger.LogWarning(exception, "Error while sending email. Retrying: {Attempt}", retryAttempt);
+                });
+
+            //    .RetryAsync(_conf.RetryLimit, onRetry: (exception, retryAttempt) =>
+            //{
+            //    _logger.LogWarning(exception, "Error while sending email. Retrying: {Attempt}", retryAttempt);
+            //});
+
+
         }
 
-        public async Task SendEmailAsync(string recipient, string subject, string message)
+        public async Task SendEmailAsync(string recipient, string subject, string message, CancellationToken token)
         {
-            int maxRetryAttempts = 3;
-            int currentSendingAttempt = 0;
+            PolicyResult? result = await _policy.ExecuteAndCaptureAsync(
+                       () => _innerEmailSender.SendEmailAsync("antysya@mail.ru", "Подключение", "Сервер успешно запущен", default));
 
-            while (currentSendingAttempt < maxRetryAttempts)
-            {
-                try
-                {
-                    _logger.LogInformation("Попытка отправить письмо: {Recipient}, {Subject}", recipient, subject);
-                    await _inner.SendEmailAsync(recipient, subject, message);
-                    return;
-                }
-                catch (Exception ex)
-                {
-                    _logger.LogWarning(ex, "Ошибка при отправки письма: {Recipient}, {Subject}", recipient, subject);
-                }
+            if (result.Outcome == OutcomeType.Failure) throw result.FinalException;
 
-                currentSendingAttempt++;
-                await Task.Delay(TimeSpan.FromSeconds(30));
-            }
-            throw new Exception("Произошла ошибка. Письмо не отправлено!");
+
         }
     }
 }
